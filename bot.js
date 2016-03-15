@@ -168,6 +168,67 @@ controller.hears(['uptime','identify yourself','who are you','what is your name'
 
 });
 
+controller.hears([''],'ambient,file_share',function(bot, message) {
+
+    if (message.file){
+        if (message.file.mimetype.match(new RegExp(/^image/))){
+            bot.reply(message,'This is image file.');
+        }
+    }
+
+});
+
+controller.hears(['と検索'],'direct_message,direct_mention',function(bot, message) {
+
+    var matches = message.text.match(/(.*)と検索$/);
+    var word = matches[1];
+    var exec = require('child_process').exec;
+    var cmd;
+
+    cmd = 'ls';
+    execCmd = function() {
+        return exec(cmd, {timeout: 1000},
+                    function(error, stdout, stderr) {
+                        console.log('stdout: '+(stdout||'none'));
+                        console.log('stderr: '+(stderr||'none'));
+                        if(error !== null) {
+                            console.log('exec error: '+error);
+                        }
+                        bot.reply(message,stdout);
+                    }
+                   )
+    };
+    execCmd();
+
+});
+
+controller.hears([''],'direct_message,direct_mention',function(bot, message) {
+
+    var tokens,nouns='名詞: ';
+
+    console.log("-----------analysis----------");
+    console.log(message.text);
+    var DIC_URL, kuromoji, tokenizer;
+    kuromoji = require('kuromoji');
+    tokenizer = null;
+    DIC_URL = "node_modules/kuromoji/dist/dict/";
+
+    kuromoji.builder({
+        dicPath: DIC_URL
+    }).build(function(err, _tokenizer) {
+        tokenizer = _tokenizer;
+        tokens = tokenizer.tokenize(message.text);
+        tokens.forEach(
+            function specifyNoun(token){
+                if(token.pos == '名詞'){
+                    nouns = nouns + token.basic_form + ',';
+                }
+            }
+        )
+        bot.reply(message,nouns.substr(0, nouns.length-1 ));
+    });
+});
+
 function formatUptime(uptime) {
     var unit = 'second';
     if (uptime > 60) {
@@ -185,3 +246,25 @@ function formatUptime(uptime) {
     uptime = uptime + ' ' + unit;
     return uptime;
 }
+
+// function analysisTokens(target) {
+//     console.log("-----------analysis----------");
+//     console.log(target);
+//     var DIC_URL, kuromoji, tokenizer;
+//     kuromoji = require('kuromoji');
+//     tokenizer = null;
+//     DIC_URL = "node_modules/kuromoji/dist/dict/";
+//     console.log("-----------analysis----------");
+
+//     kuromoji.builder({
+//         dicPath: DIC_URL
+//     }).build(function(err, _tokenizer) {
+//         console.log("-----------build----------");
+//         var tokens;
+//         tokenizer = _tokenizer;
+//         tokens = tokenizer.tokenize(target);
+//         console.log(tokens);
+//         return tokens;
+//     });
+
+// }
