@@ -185,9 +185,9 @@ controller.hears(['と検索'],'direct_message,direct_mention',function(bot, mes
     var exec = require('child_process').exec;
     var cmd;
 
-    cmd = 'ls';
+    cmd = './plugins/search_wiki/bin/search_wiki ' + word;
     execCmd = function() {
-        return exec(cmd, {timeout: 1000},
+        return exec(cmd, {timeout: 100000},
                     function(error, stdout, stderr) {
                         console.log('stdout: '+(stdout||'none'));
                         console.log('stderr: '+(stderr||'none'));
@@ -204,7 +204,7 @@ controller.hears(['と検索'],'direct_message,direct_mention',function(bot, mes
 
 controller.hears([''],'direct_message,direct_mention',function(bot, message) {
 
-    var tokens,nouns='名詞: ';
+    var tokens,nouns='';
 
     console.log("-----------analysis----------");
     console.log(message.text);
@@ -221,12 +221,32 @@ controller.hears([''],'direct_message,direct_mention',function(bot, message) {
         tokens.forEach(
             function specifyNoun(token){
                 if(token.pos == '名詞'){
-                    nouns = nouns + token.basic_form + ',';
+                    nouns = nouns + token.basic_form + ' ';
                 }
             }
         )
-        bot.reply(message,nouns.substr(0, nouns.length-1 ));
+        bot.reply(message,nouns.substr(0, nouns.length-1));
+
+        var exec = require('child_process').exec;
+        var cmd;
+
+        cmd = 'path/to/search_wiki/bin/search_wiki ' + nouns.substr(0, nouns.length-1);
+        console.log(cmd)
+        execCmd = function() {
+            return exec(cmd, {timeout: 100000},
+                        function(error, stdout, stderr) {
+                            console.log('stdout: '+(stdout||'none'));
+                            console.log('stderr: '+(stderr||'none'));
+                            if(error !== null) {
+                                console.log('exec error: '+error);
+                            }
+                            bot.reply(message,stdout);
+                        }
+                       )
+        };
+        execCmd();
     });
+
 });
 
 function formatUptime(uptime) {
@@ -246,25 +266,3 @@ function formatUptime(uptime) {
     uptime = uptime + ' ' + unit;
     return uptime;
 }
-
-// function analysisTokens(target) {
-//     console.log("-----------analysis----------");
-//     console.log(target);
-//     var DIC_URL, kuromoji, tokenizer;
-//     kuromoji = require('kuromoji');
-//     tokenizer = null;
-//     DIC_URL = "node_modules/kuromoji/dist/dict/";
-//     console.log("-----------analysis----------");
-
-//     kuromoji.builder({
-//         dicPath: DIC_URL
-//     }).build(function(err, _tokenizer) {
-//         console.log("-----------build----------");
-//         var tokens;
-//         tokenizer = _tokenizer;
-//         tokens = tokenizer.tokenize(target);
-//         console.log(tokens);
-//         return tokens;
-//     });
-
-// }
