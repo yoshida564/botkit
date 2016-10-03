@@ -64,44 +64,46 @@ This bot demonstrates many of the core features of Botkit:
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
 
-if (!process.env.token) {
-    console.log('Error: Specify token in environment');
+var ConfigFile = require('config');
+if (!ConfigFile.token) {
+    console.log('Error: Specify token in config/default.yaml');
     process.exit(1);
 }
 
 var Botkit = require('./lib/Botkit.js');
 var os = require('os');
+var XMLHttpRequest = require('xhr2')
 
 var controller = Botkit.slackbot({
     debug: true,
 });
 
 var bot = controller.spawn({
-    token: process.env.token
+    token: ConfigFile.token
 }).startRTM();
 
 
-controller.hears(['hello','hi'],'direct_message,direct_mention,mention',function(bot, message) {
+// controller.hears(['hello','hi'],'direct_message,direct_mention,mention',function(bot, message) {
 
-    bot.api.reactions.add({
-        timestamp: message.ts,
-        channel: message.channel,
-        name: 'robot_face',
-    },function(err, res) {
-        if (err) {
-            bot.botkit.log('Failed to add emoji reaction :(',err);
-        }
-    });
+//     bot.api.reactions.add({
+//         timestamp: message.ts,
+//         channel: message.channel,
+//         name: 'robot_face',
+//     },function(err, res) {
+//         if (err) {
+//             bot.botkit.log('Failed to add emoji reaction :(',err);
+//         }
+//     });
 
 
-    controller.storage.users.get(message.user,function(err, user) {
-        if (user && user.name) {
-            bot.reply(message,'Hello ' + user.name + '!!');
-        } else {
-            bot.reply(message,'Hello.');
-        }
-    });
-});
+//     controller.storage.users.get(message.user,function(err, user) {
+//         if (user && user.name) {
+//             bot.reply(message,'Hello ' + user.name + '!!');
+//         } else {
+//             bot.reply(message,'Hello.');
+//         }
+//     });
+// });
 
 controller.hears(['call me (.*)'],'direct_message,direct_mention,mention',function(bot, message) {
     var matches = message.text.match(/call me (.*)/i);
@@ -172,13 +174,63 @@ controller.hears([''],'ambient,file_share',function(bot, message) {
 
     if (message.file){
         if (message.file.mimetype.match(new RegExp(/^image/))){
-            bot.reply(message,'This is image file.');
+            console.log(message.file)
+            const request = require('request');
+            var fs = require('fs');
+            var url = message.file.url_private_download
+            var pinatra = ConfigFile.pinatra
+            request(
+                {method: 'GET', url: url, encoding: null, headers: {'Authorization': 'Bearer '+ConfigFile.token}},
+                function (error, response, body){
+                    if(!error && response.statusCode === 200){
+                        var binary = body;
+                        fs.writeFileSync('./img/'+message.file.name.replace(/\s/g, "_"), body, 'binary');
+                        var album_id = ConfigFile.album_id.auto_buckup
+                        var exec = require('child_process').exec;
+                        var cmd;
+                        cmd = 'curl ' +
+                            '-F file1=@./img/'+ message.file.name.replace(/\s/g, "_") +
+                            " " + pinatra + '/' + album_id + '/photo/new';
+                        execCmd = function() {
+                            return exec(cmd, {timeout: 100000},
+                                        function(error, stdout, stderr) {
+                                            console.log('stdout: '+(stdout||'none'));
+                                            console.log('stderr: '+(stderr||'none'));
+                                            if(error !== null) {
+                                                console.log('exec error: '+error);
+                                            }
+                                            if(stdout !== null) {
+                                                var res = JSON.parse(stdout)
+                                                bot.reply(message,'Successfully uploaded: ' + res[0]["title"] + "\n" + res[0]["src"]);
+                                                fs.unlink('./img/'+message.file.name.replace(/\s/g, "_"), function (err) {
+                                                    if (err) throw err;
+                                                    console.log('successfully deleted '+message.file.name.replace(/\s/g, "_"));
+                                                });
+                                            }
+                                        }
+                                       )
+                        };
+                        execCmd();
+                        // var req = request.post(pinatra, function (err, resp, body) {
+                        //     if (err) {
+                        //         console.log('Error!:' + err);
+                        //     } else {
+                        //         console.log('URL: ' + body);
+                        //     }
+                        // });
+                        // var form = req.form();
+                        // form.append('file', fs.readFileSync('./' + message.file.name), {
+                        //     filename: message.file.name,
+                        //     contentType: message.file.mimetype
+                        // });
+                    }
+                }
+            );
         }
     }
-
 });
 
-controller.hears(['と検索'],'direct_message,direct_mention',function(bot, message) {
+controller.hears(['と検索'],'direct_message,direct_mention,mention',function(bot, message) {
 
     var matches = message.text.match(/(.*)と検索$/);
     var word = matches[1];
@@ -202,52 +254,52 @@ controller.hears(['と検索'],'direct_message,direct_mention',function(bot, mes
 
 });
 
-controller.hears([''],'direct_message,direct_mention',function(bot, message) {
+// controller.hears([''],'direct_message,direct_mention',function(bot, message) {
 
-    var tokens,nouns='';
+//     var tokens,nouns='';
 
-    console.log("-----------analysis----------");
-    console.log(message.text);
-    var DIC_URL, kuromoji, tokenizer;
-    kuromoji = require('kuromoji');
-    tokenizer = null;
-    DIC_URL = "node_modules/kuromoji/dist/dict/";
+//     console.log("-----------analysis----------");
+//     console.log(message.text);
+//     var DIC_URL, kuromoji, tokenizer;
+//     kuromoji = require('kuromoji');
+//     tokenizer = null;
+//     DIC_URL = "node_modules/kuromoji/dist/dict/";
 
-    kuromoji.builder({
-        dicPath: DIC_URL
-    }).build(function(err, _tokenizer) {
-        tokenizer = _tokenizer;
-        tokens = tokenizer.tokenize(message.text);
-        tokens.forEach(
-            function specifyNoun(token){
-                if(token.pos == '名詞'){
-                    nouns = nouns + token.basic_form + ' ';
-                }
-            }
-        )
-        bot.reply(message,nouns.substr(0, nouns.length-1));
+//     kuromoji.builder({
+//         dicPath: DIC_URL
+//     }).build(function(err, _tokenizer) {
+//         tokenizer = _tokenizer;
+//         tokens = tokenizer.tokenize(message.text);
+//         tokens.forEach(
+//             function specifyNoun(token){
+//                 if(token.pos == '名詞'){
+//                     nouns = nouns + token.basic_form + ' ';
+//                 }
+//             }
+//         )
+//         bot.reply(message,nouns.substr(0, nouns.length-1));
 
-        var exec = require('child_process').exec;
-        var cmd;
+//         var exec = require('child_process').exec;
+//         var cmd;
 
-        cmd = 'path/to/search_wiki/bin/search_wiki ' + nouns.substr(0, nouns.length-1);
-        console.log(cmd)
-        execCmd = function() {
-            return exec(cmd, {timeout: 100000},
-                        function(error, stdout, stderr) {
-                            console.log('stdout: '+(stdout||'none'));
-                            console.log('stderr: '+(stderr||'none'));
-                            if(error !== null) {
-                                console.log('exec error: '+error);
-                            }
-                            bot.reply(message,stdout);
-                        }
-                       )
-        };
-        execCmd();
-    });
+//         cmd = '/Users/yoshidahisashi/myexperiment/search_wiki/bin/search_wiki ' + nouns.substr(0, nouns.length-1);
+//         console.log(cmd)
+//         execCmd = function() {
+//             return exec(cmd, {timeout: 100000},
+//                         function(error, stdout, stderr) {
+//                             console.log('stdout: '+(stdout||'none'));
+//                             console.log('stderr: '+(stderr||'none'));
+//                             if(error !== null) {
+//                                 console.log('exec error: '+error);
+//                             }
+//                             bot.reply(message,stdout);
+//                         }
+//                        )
+//         };
+//         execCmd();
+//     });
 
-});
+// });
 
 function formatUptime(uptime) {
     var unit = 'second';
